@@ -149,6 +149,19 @@ describe("Logger", () => {
 		expect(outside).not.toHaveProperty("reqId");
 	});
 
+	it("does not carry one line's fields into the next line of the same context", () => {
+		const { logger, parsed } = setup();
+
+		logContext.run({ reqId: "r1" }, () => {
+			logger.info({ userId: "u1" }, "first");
+			logger.info("second");
+		});
+
+		const [, second] = parsed();
+		expect(second).toMatchObject({ message: "second", reqId: "r1" });
+		expect(second).not.toHaveProperty("userId");
+	});
+
 	it("caches the top-level fields as details, including the log context", () => {
 		const { logger } = setup();
 
@@ -183,6 +196,11 @@ describe("Logger.httpMiddleware", () => {
 			res.json({ ok: true });
 		});
 		app.get("/api/v1/health", (_req, res) => {
+			res.json({ ok: true });
+		});
+		app.get("/api/v1/late", (_req, res) => {
+			// Logs after the response, like a fire-and-forget email failing once the request is done
+			res.on("finish", () => setImmediate(() => logger.warn({ err: new Error("late failure") }, "late line")));
 			res.json({ ok: true });
 		});
 		app.get("/static.js", (_req, res) => {
@@ -295,6 +313,21 @@ describe("Logger.httpMiddleware", () => {
 
 			const handlerLine = parsed().find((line) => line.message === "handler line");
 			expect(handlerLine?.reqId).toBe(response.headers.get("x-request-id"));
+		} finally {
+			await close();
+		}
+	});
+
+	it("logs a line written after the response without the request line's fields", async () => {
+		const { request, parsed, close } = await setupApp();
+		try {
+			const response = await request("/api/v1/late");
+			await new Promise((resolve) => setImmediate(resolve));
+
+			const lateLine = parsed().find((line) => line.message === "late line");
+			expect(lateLine?.reqId).toBe(response.headers.get("x-request-id"));
+			expect(lateLine).not.toHaveProperty("httpResponse");
+			expect(lateLine).not.toHaveProperty("httpDurationMs");
 		} finally {
 			await close();
 		}
