@@ -21,7 +21,7 @@ import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useGet } from "@/Hooks/UseApi";
 import { type MonitorDetailsResponse, supportsGeoCheck } from "@/Types/Monitor";
-import type { ChecksResponse } from "@/Types/Check";
+import type { ChecksResponse, GroupedCheck } from "@/Types/Check";
 import type {
 	GeoChecksResult,
 	FlatGeoChecksResponse,
@@ -31,6 +31,10 @@ import { t } from "i18next";
 import { Typography } from "@mui/material";
 import type { DateRange } from "@/Types/Query";
 import { useFormatDate } from "@/Hooks/useFormatDate";
+import { getUptimePercentageColor } from "@/Utils/MonitorUtils";
+
+const sumTotalChecks = (checks: GroupedCheck[] = []) =>
+	checks.reduce((acc, check) => acc + (check.totalChecks || 0), 0);
 
 interface CertificateResponse {
 	certificateDate: string;
@@ -185,6 +189,17 @@ const UptimeDetailsPage = () => {
 	}
 	const isHeartbeat = monitor.type === "heartbeat";
 
+	const upChecks = sumTotalChecks(monitorData.groupedUpChecks);
+	const downChecks = sumTotalChecks(monitorData.groupedDownChecks);
+	const rangeChecks = upChecks + downChecks;
+	const upPercentage = rangeChecks > 0 ? upChecks / rangeChecks : undefined;
+	const downPercentage = rangeChecks > 0 ? downChecks / rangeChecks : undefined;
+	// Both charts share the uptime color: a low downtime is as good as a high uptime
+	const percentageColor =
+		upPercentage !== undefined
+			? theme.palette[getUptimePercentageColor(upPercentage)].main
+			: undefined;
+
 	const geoChecksForTable = geoChecksTableData?.geoChecks ?? [];
 	const geoChecksCount = geoChecksTableData?.geoChecksCount ?? 0;
 
@@ -223,12 +238,16 @@ const UptimeDetailsPage = () => {
 					icon={<TrendingUp />}
 					checks={monitorData?.groupedUpChecks ?? []}
 					range={dateRange}
+					percentage={upPercentage}
+					percentageColor={percentageColor}
 				/>
 				<HistogramStatus
 					title={t("common.charts.labels.downtime")}
 					icon={<AlertTriangle />}
 					checks={monitorData?.groupedDownChecks ?? []}
 					range={dateRange}
+					percentage={downPercentage}
+					percentageColor={percentageColor}
 				/>
 				{!isHeartbeat && (
 					<RadialAvgResponse

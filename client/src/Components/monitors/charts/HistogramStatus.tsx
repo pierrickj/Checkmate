@@ -8,6 +8,7 @@ import { ResponsiveContainer, BarChart, XAxis, Bar, Cell, Tooltip } from "rechar
 import { getResponseTimeColor } from "@/Utils/MonitorUtils";
 import type { GroupedCheck } from "@/Types/Check";
 import { useFormatDate } from "@/Hooks/useFormatDate";
+import { formatPercentage } from "@/Utils/FormatUtils";
 
 interface XLabelProps {
 	p1: GroupedCheck;
@@ -50,6 +51,9 @@ interface HistogramStatusProps {
 	icon: React.ReactNode;
 	checks?: GroupedCheck[];
 	range: string;
+	// Share of the range's checks shown by this chart (0-1); omitted when the range has no checks
+	percentage?: number;
+	percentageColor?: string;
 }
 
 export const HistogramStatus = ({
@@ -57,6 +61,8 @@ export const HistogramStatus = ({
 	icon,
 	checks = [],
 	range,
+	percentage,
+	percentageColor,
 }: HistogramStatusProps) => {
 	const { t } = useTranslation();
 	const theme = useTheme();
@@ -120,6 +126,11 @@ export const HistogramStatus = ({
 					<Stack>
 						<Typography>Total checks: {totalChecks}</Typography>
 					</Stack>
+					{percentage !== undefined && (
+						<Typography color={percentageColor}>
+							{formatPercentage(percentage)}
+						</Typography>
+					)}
 				</Stack>
 				<ResponsiveContainer
 					width="100%"
